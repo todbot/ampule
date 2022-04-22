@@ -133,8 +133,13 @@ def __match_route(path, method):
             return (match.groups(), route)
     return None
 
-def listen(socket, timeout=30):
-    client, remote_address = socket.accept()
+def listen(socket, timeout=30, accept_timeout=0):
+    socket.settimeout(accept_timeout)
+    try:
+        client, remote_address = socket.accept()
+    except BaseException as e:
+        # print("exception", type(e), e, e.errno, e.strerror, dir(e))
+        return  # don't block
     try:
         client.settimeout(timeout)
         request = __read_request(client)

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <meta name="viewport" content="width=device-width,maximum-scale=1">
+    <title> URL API demo </title>
+    <style>
+      body { font-family: sans-serif; }
+      #main_content { padding: 20px; border: solid grey; }
+      .ledbox { width: 20px; height: 20px; display: inline-block border: solid grey; }
+      .ledboxbig { width: 50px; height: 50px; display: table-cell; border: solid grey; color:#fff; font-family:sans-serif; font-size:10pt; line-height:0.8; text-align: center;  text-shadow: 1px 1px 4px black; vertical-align:middle;}
+  </style>
+  </head>
+  <body>
+    <div id="main_content_wrap" class="outer">
+    <section id="main_content" class="inner">
+
+    <h1>CircuitPython HTTP REST API LED WOOT </h1>
+
+    <div>
+      <p> Click a color pattern:</p>
+      
+      <a target="api" href="/mode/solid">
+        <div id="solidbox" class="ledboxbig"
+             style="background-color:#333);">solid</div></a>
+      <a target="api" href="/mode/cylon">
+        <div id="cylonbox" class="ledboxbig"
+             style="background-image: linear-gradient(to right, black,red,black);">cylon</div></a>
+      <a target="api" href="/mode/confetti">
+        <div id="confettibox" class="ledboxbig"
+             style="background-image: radial-gradient(#e66666, #111111, #e66666, #111111);">confetti</div></a>
+      <a target="api" href="/mode/rainbow">
+        <div id="rainbowbox" class="ledboxbig"
+             style="background-image: linear-gradient(to right,red,orange,yellow,green,blue,indigo,violet);">johnpark<br>rainbow</div></a>
+    </div>
+
+    <div>
+      <p> Hover to change color: <p>
+        
+      <div style="position:relative; top:0; left:0">
+        <img id="rainbowgradient" src="grad-min_350x20.png" width="350" height="20"
+             style="cursor:pointer; position:relative; top:0;left:0"/>
+        <div id="rainbowhandle"
+             style="position:absolute; top:-4px; left:0px; width:5px; height:24px; border:2px solid grey">
+      </div>
+    </div>
+
+    <p> Response from CircuitPython server:</p>
+    <iframe name="api" width="100%" height="100" src="/status"></iframe>
+
+    </section>
+    </div>
+</body>
+
+<script>
+
+let rainbowgradient = document.getElementById('rainbowgradient');
+let rainbowhandle = document.getElementById('rainbowhandle');
+let solidbox = document.getElementById('solidbox');
+let cylonbox = document.getElementById('cylonbox');
+let timerid = 0;
+
+rainbowgradient.addEventListener('click', handleClick);
+rainbowgradient.addEventListener('mousemove', handleClick);
+rainbowgradient.addEventListener('touchmove', handleClick, {passive:false} );
+
+updateUI(10, '#ff0000');
+
+//
+function updateUI(x,rgbstr) {
+  rainbowhandle.style.left = (x-5) + 'px'; // move handle to mouse
+  solidbox.style.backgroundColor = rgbstr;
+  cylonbox.style.backgroundImage = "linear-gradient(to right,black," + rgbstr +",black)"
+}
+
+//
+function handleClick(event) {
+  // get click coordinates in image space
+  const [x, y] = function() {
+    if (event.type == "touchmove") {
+      event.preventDefault();
+      const boundingClientRect = event.target.getBoundingClientRect();
+      return [
+        event.changedTouches[0].clientX - boundingClientRect.x,
+        event.changedTouches[0].clientY - boundingClientRect.y,
+      ];
+    }
+    return [event.offsetX, event.offsetY];
+  }();
+
+  let rgb = hsl_to_rgb(x, 1, 0.5); // convert hue to rgb array
+  rgb = rgb.map( x => parseInt(x * 255) ); // convert to 0-255
+  let rgbstr = rgb_to_hexstr(rgb[0], rgb[1], rgb[2]);
+  
+  updateUI(x, rgbstr)
+  updateLEDs(rgbstr);
+}
+
+// 
+function updateLEDs(rgbstr) {
+  console.log("rgbstr: "+rgbstr);
+  let f = function() { fetch_it("/set?rgb="+rgbstr) }
+  clearTimeout(timerid);
+  timerid = setTimeout(f, 100); // rate limit API request
+}
+
+// input: h as an angle in [0,360] and s,l in [0,1] - output: r,g,b in [0,1]
+function hsl_to_rgb(h,s,l) {
+   let a=s*Math.min(l,1-l);
+   let f= (n,k=(n+h/30)%12) => l - a*Math.max(Math.min(k-3,9-k,1),-1);
+   return [f(0),f(8),f(4)];
+}
+
+// turn r,g,b triplet into a hex color code (e.g. "#FF0033")
+function rgb_to_hexstr(red, green, blue) {
+  const rgb = (red << 16) | (green << 8) | (blue << 0);
+  return '#' + (0x1000000 + rgb).toString(16).slice(1);
+}
+
+// fetch a URL and (maybe?) return JSON results
+function fetch_it(resourcestr) {
+  resourcestr = resourcestr.replace('#', '%23')
+  console.log("resource:"+resourcestr);
+  fetch(resourcestr).then(function(response) {
+    if (!response.ok) {
+      throw new Error('HTTP error! status: ' + response.status);
+    }
+    const results = response.json();
+    return results
+  });
+}
+
+</script>
+</html>
